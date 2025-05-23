@@ -24,6 +24,7 @@ function PomodoroTimer() {
     const lastTimestampRef = useRef(null)
     const rafRef = useRef(null)
     const endTimeRef = useRef(null)
+    const pausedTimeRef = useRef(null)
     // Sonido ding
     const dingRef = useRef(null)
 
@@ -38,12 +39,7 @@ function PomodoroTimer() {
     useEffect(() => {
         if (!isRunning) {
             if (rafRef.current) cancelAnimationFrame(rafRef.current)
-            lastTimestampRef.current = null
-            endTimeRef.current = null
             return
-        }
-        if (!endTimeRef.current) {
-            endTimeRef.current = Date.now() + timeLeft * 1000
         }
         function tick() {
             const now = Date.now()
@@ -124,17 +120,19 @@ function PomodoroTimer() {
 
     // Sincronizar timeLeft cuando focusMinutes cambia y el modo es focus y no está corriendo
     useEffect(() => {
-        if (!isRunning && mode === 'focus') {
+        if (mode === 'focus' && !isRunning) {
             setTimeLeft(focusMinutes * 60);
         }
-    }, [focusMinutes, isRunning, mode]);
+        // eslint-disable-next-line
+    }, [focusMinutes]);
 
     // Sincronizar timeLeft cuando breakMinutes cambia y el modo es break y no está corriendo
     useEffect(() => {
-        if (!isRunning && mode === 'break') {
+        if (mode === 'break' && !isRunning) {
             setTimeLeft(breakMinutes * 60);
         }
-    }, [breakMinutes, isRunning, mode]);
+        // eslint-disable-next-line
+    }, [breakMinutes]);
 
     // Guardar valores en localStorage cuando cambian
     useEffect(() => {
@@ -153,13 +151,21 @@ function PomodoroTimer() {
 
     // Play
     function handlePlay() {
-        setIsRunning(true)
-        endTimeRef.current = Date.now() + timeLeft * 1000
+        if (!isRunning) {
+            endTimeRef.current = Date.now() + timeLeft * 1000;
+            setIsRunning(true);
+        }
     }
 
     // Pausa
     function handlePause() {
-        setIsRunning(false)
+        if (isRunning && endTimeRef.current) {
+            const now = Date.now();
+            // Calcula el tiempo restante REAL
+            const secondsLeft = Math.max(0, Math.round((endTimeRef.current - now) / 1000));
+            setTimeLeft(secondsLeft);
+        }
+        setIsRunning(false);
     }
 
     // Calcula el progreso (0 a 1)
