@@ -14,12 +14,10 @@ function ConfigDialog({ open, onOpenChange, focusMinutes, breakMinutes, setFocus
     }
   }, [open, focusMinutes, breakMinutes]);
 
-  // Al guardar, propaga los valores locales y los guarda en localStorage
+  // Al guardar, propaga los valores locales y deja que el componente padre los persista (no guardes en localStorage aquí)
   function handleSave() {
     setFocusMinutes(localFocus);
     setBreakMinutes(localBreak);
-    localStorage.setItem('focusMinutes', localFocus);
-    localStorage.setItem('breakMinutes', localBreak);
     onOpenChange(false);
   }
 

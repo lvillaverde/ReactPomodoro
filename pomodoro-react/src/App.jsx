@@ -2,17 +2,26 @@ import { useState, useEffect } from 'react'
 import { Theme, Button, Flex, Text } from "@radix-ui/themes";
 import { auth, googleProvider } from "./firebase";
 import { signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
+import resetLocalConfigAndState from "./userStorage";
 import reactLogo from './assets/react.svg'
 import viteLogo from '/vite.svg'
 import './App.css'
 import PomodoroTimer from './PomodoroTimer'
+import TaskList from './TaskList'
 
 function App() {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
+    let lastUser = null;
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      // Solo recarga si el usuario pasó de logueado a deslogueado
+      if (lastUser && !firebaseUser) {
+        resetLocalConfigAndState();
+        window.location.reload();
+      }
       setUser(firebaseUser);
+      lastUser = firebaseUser;
     });
     return () => unsubscribe();
   }, []);
@@ -28,6 +37,7 @@ function App() {
   const handleLogout = async () => {
     try {
       await signOut(auth);
+      // No es necesario llamar aquí a resetLocalConfigAndState, ya que se llama en el useEffect de arriba
     } catch (error) {
       alert("Error al cerrar sesión: " + error.message);
     }
@@ -45,7 +55,8 @@ function App() {
           <Button size="1" color="green" onClick={handleLogin}>Iniciar sesión con Google</Button>
         )}
       </Flex>
-      <PomodoroTimer />
+      {user && <TaskList user={user} />}
+      <PomodoroTimer user={user} />
     </Theme>
   )
 }

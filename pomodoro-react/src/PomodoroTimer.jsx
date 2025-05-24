@@ -1,26 +1,20 @@
 import { useState, useRef, useEffect } from 'react'
 import "@radix-ui/themes/styles.css";
-import { Button, Flex, Card, Heading, Text, Progress } from "@radix-ui/themes";
+import { Button, Flex, Card, Heading, Text, Progress, Skeleton } from "@radix-ui/themes";
 import ConfigDialog from "./ConfigDialog";
 import DingSound from "./assets/ding.wav";
+import { saveTimerState, loadTimerState, saveConfig, loadConfig } from "./userStorage";
 
 
-function PomodoroTimer() {
-    // Lee los valores iniciales de localStorage SOLO al primer render
-    function getInitialFocus() {
-        const stored = localStorage.getItem('focusMinutes');
-        return stored !== null && !isNaN(Number(stored)) ? Number(stored) : 15;
-    }
-    function getInitialBreak() {
-        const stored = localStorage.getItem('breakMinutes');
-        return stored !== null && !isNaN(Number(stored)) ? Number(stored) : 5;
-    }
-    const [mode, setMode] = useState('focus') // 'focus' o 'break'
-    const [isRunning, setIsRunning] = useState(false)
-    const [focusMinutes, setFocusMinutes] = useState(getInitialFocus);
-    const [breakMinutes, setBreakMinutes] = useState(getInitialBreak);
-    const [timeLeft, setTimeLeft] = useState(() => getInitialFocus() * 60);
+function PomodoroTimer({ user }) {
+    // Inicializa los valores como null para evitar mostrar datos hasta que se cargue Firestore/localStorage
+    const [mode, setMode] = useState(null);
+    const [isRunning, setIsRunning] = useState(false);
+    const [focusMinutes, setFocusMinutes] = useState(null);
+    const [breakMinutes, setBreakMinutes] = useState(null);
+    const [timeLeft, setTimeLeft] = useState(null);
     const [openConfig, setOpenConfig] = useState(false)
+    const [loading, setLoading] = useState(true);
     const lastTimestampRef = useRef(null)
     const rafRef = useRef(null)
     const endTimeRef = useRef(null)
@@ -57,7 +51,7 @@ function PomodoroTimer() {
                     setTimeLeft(breakMinutes * 60);
                     setIsRunning(true);
                     endTimeRef.current = Date.now() + breakMinutes * 60 * 1000;
-                    saveTimerState({
+                    saveTimerStateWrapper({
                         mode: 'break',
                         isRunning: true,
                         timeLeft: breakMinutes * 60,
@@ -68,7 +62,7 @@ function PomodoroTimer() {
                     setTimeLeft(focusMinutes * 60);
                     setIsRunning(true);
                     endTimeRef.current = Date.now() + focusMinutes * 60 * 1000;
-                    saveTimerState({
+                    saveTimerStateWrapper({
                         mode: 'focus',
                         isRunning: true,
                         timeLeft: focusMinutes * 60,
@@ -96,7 +90,7 @@ function PomodoroTimer() {
                     setTimeLeft(breakMinutes * 60);
                     setIsRunning(true);
                     endTimeRef.current = Date.now() + breakMinutes * 60 * 1000;
-                    saveTimerState({
+                    saveTimerStateWrapper({
                         mode: 'break',
                         isRunning: true,
                         timeLeft: breakMinutes * 60,
@@ -107,7 +101,7 @@ function PomodoroTimer() {
                     setTimeLeft(focusMinutes * 60);
                     setIsRunning(true);
                     endTimeRef.current = Date.now() + focusMinutes * 60 * 1000;
-                    saveTimerState({
+                    saveTimerStateWrapper({
                         mode: 'focus',
                         isRunning: true,
                         timeLeft: focusMinutes * 60,
@@ -202,47 +196,64 @@ function PomodoroTimer() {
 
     // Sincronizar timeLeft cuando focusMinutes cambia y el modo es focus y no está corriendo
     useEffect(() => {
+        if (loading) return;
         if (mode === 'focus' && !isRunning) {
             setTimeLeft(focusMinutes * 60);
         }
         // eslint-disable-next-line
-    }, [focusMinutes]);
+    }, [focusMinutes, loading]);
 
     // Sincronizar timeLeft cuando breakMinutes cambia y el modo es break y no está corriendo
     useEffect(() => {
+        if (loading) return;
         if (mode === 'break' && !isRunning) {
             setTimeLeft(breakMinutes * 60);
         }
         // eslint-disable-next-line
-    }, [breakMinutes]);
+    }, [breakMinutes, loading]);
 
-    // Guardar valores en localStorage cuando cambian
+    // Guardar valores en storage cuando cambian
     useEffect(() => {
-        localStorage.setItem('focusMinutes', focusMinutes);
-        localStorage.setItem('breakMinutes', breakMinutes);
-    }, [focusMinutes, breakMinutes]);
+        if (loading) return;
+        saveConfig({ focusMinutes, breakMinutes });
+    }, [focusMinutes, breakMinutes, loading]);
 
     // --- PERSISTENCIA DE ESTADO DEL TIMER ---
-    function saveTimerState({
-        mode,
-        isRunning,
-        timeLeft,
-        endTime
-    }) {
-        localStorage.setItem('pomodoro-timer-state', JSON.stringify({
+    async function saveTimerStateWrapper({ mode, isRunning, timeLeft, endTime }) {
+        await saveTimerState({
             mode,
             isRunning,
             timeLeft,
             endTime: isRunning ? endTime : null,
-        }));
+        });
     }
 
-    // Leer estado al iniciar
+    // Al montar o cuando cambia el usuario, cargar configuración y estado del timer
     useEffect(() => {
-        const saved = localStorage.getItem('pomodoro-timer-state');
-        if (saved) {
-            try {
-                const { mode: savedMode, isRunning: savedIsRunning, timeLeft: savedTimeLeft, endTime } = JSON.parse(saved);
+        async function loadAll() {
+            setLoading(true);
+
+            // Detener cualquier timer en curso al cambiar usuario y guardar el estado detenido
+            setIsRunning(false);
+            endTimeRef.current = null;
+            lastTimestampRef.current = null;
+            // Guarda el timer detenido en la base o localStorage
+            await saveTimerState({
+                mode: mode ?? 'focus',
+                isRunning: false,
+                timeLeft: timeLeft ?? 15 * 60,
+                endTime: null
+            });
+
+            const config = await loadConfig();
+            let loadedFocus = config?.focusMinutes ?? 15;
+            let loadedBreak = config?.breakMinutes ?? 5;
+            setFocusMinutes(loadedFocus);
+            setBreakMinutes(loadedBreak);
+
+            const saved = await loadTimerState();
+            if (saved) {
+                const { mode: savedMode, isRunning: savedIsRunning, timeLeft: savedTimeLeft, endTime } = saved;
                 setMode(savedMode || 'focus');
                 if (savedIsRunning && endTime) {
                     const now = Date.now();
@@ -260,14 +271,21 @@ function PomodoroTimer() {
                     endTimeRef.current = null;
                     setIsRunning(false);
                 } else {
-                    setTimeLeft(savedMode === 'break' ? breakMinutes * 60 : focusMinutes * 60);
+                    setTimeLeft((savedMode === 'break' ? loadedBreak : loadedFocus) * 60);
                     endTimeRef.current = null;
                     setIsRunning(false);
                 }
-            } catch {}
+            } else {
+                setMode('focus');
+                setTimeLeft(loadedFocus * 60);
+                endTimeRef.current = null;
+                setIsRunning(false);
+            }
+            setLoading(false);
         }
+        loadAll();
         // eslint-disable-next-line
-    }, []);
+    }, [user]);
 
     // Reiniciar
     function handleReset() {
@@ -276,7 +294,7 @@ function PomodoroTimer() {
         setTimeLeft(focusMinutes * 60)
         lastTimestampRef.current = null
         endTimeRef.current = null
-        saveTimerState({
+        saveTimerStateWrapper({
             mode: 'focus',
             isRunning: false,
             timeLeft: focusMinutes * 60,
@@ -289,7 +307,7 @@ function PomodoroTimer() {
         if (!isRunning) {
             endTimeRef.current = Date.now() + timeLeft * 1000;
             setIsRunning(true);
-            saveTimerState({
+            saveTimerStateWrapper({
                 mode,
                 isRunning: true,
                 timeLeft,
@@ -304,14 +322,14 @@ function PomodoroTimer() {
             const now = Date.now();
             const secondsLeft = Math.max(0, Math.round((endTimeRef.current - now) / 1000));
             setTimeLeft(secondsLeft);
-            saveTimerState({
+            saveTimerStateWrapper({
                 mode,
                 isRunning: false,
                 timeLeft: secondsLeft,
                 endTime: null
             });
         } else {
-            saveTimerState({
+            saveTimerStateWrapper({
                 mode,
                 isRunning: false,
                 timeLeft,
@@ -328,7 +346,7 @@ function PomodoroTimer() {
             setTimeLeft(breakMinutes * 60);
             setIsRunning(false);
             endTimeRef.current = null;
-            saveTimerState({
+            saveTimerStateWrapper({
                 mode: 'break',
                 isRunning: false,
                 timeLeft: breakMinutes * 60,
@@ -339,7 +357,7 @@ function PomodoroTimer() {
             setTimeLeft(focusMinutes * 60);
             setIsRunning(false);
             endTimeRef.current = null;
-            saveTimerState({
+            saveTimerStateWrapper({
                 mode: 'focus',
                 isRunning: false,
                 timeLeft: focusMinutes * 60,
@@ -350,7 +368,26 @@ function PomodoroTimer() {
 
     // Calcula el progreso (0 a 1)
     const totalTime = mode === 'focus' ? focusMinutes * 60 : breakMinutes * 60;
-    const progress = timeLeft / totalTime;
+    const progress = timeLeft && totalTime ? timeLeft / totalTime : 0;
+
+    if (loading || mode === null || focusMinutes === null || breakMinutes === null || timeLeft === null) {
+        return (
+            <Flex direction="column" align="center" justify="center" style={{ margin: '2rem auto', minHeight: 320 }}>
+                <Card style={{ width: '100%', padding: 24 }}>
+                    <div style={{ background: "#eee", borderRadius: 8, height: 32, width: 180, margin: "0 auto", marginBottom: 16 }} />
+                    <div style={{ background: "#eee", borderRadius: 8, height: 56, width: 120, margin: "1.5rem auto" }} />
+                    <div style={{ background: "#eee", borderRadius: 8, height: 16, width: "100%", margin: "1rem 0" }} />
+                    <Flex gap="3" justify="center" style={{ marginTop: 24 }}>
+                        <div style={{ background: "#eee", borderRadius: 8, height: 32, width: 60 }} />
+                        <div style={{ background: "#eee", borderRadius: 8, height: 32, width: 60 }} />
+                        <div style={{ background: "#eee", borderRadius: 8, height: 32, width: 60 }} />
+                        <div style={{ background: "#eee", borderRadius: 8, height: 32, width: 60 }} />
+                        <div style={{ background: "#eee", borderRadius: 8, height: 32, width: 90 }} />
+                    </Flex>
+                </Card>
+            </Flex>
+        );
+    }
 
     return (
         <Flex direction="column" align="center" justify="center" style={{ margin: '2rem auto', minHeight: 320 }}>
