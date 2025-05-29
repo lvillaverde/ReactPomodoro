@@ -1,13 +1,12 @@
 import { useState, useEffect } from 'react'
-import { Theme, Button, Flex, Text } from "@radix-ui/themes";
+import { Theme, Flex, Box, Grid, Container } from "@radix-ui/themes";
 import { auth, googleProvider } from "./firebase";
 import { signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
 import resetLocalConfigAndState from "./userStorage";
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
 import './App.css'
 import PomodoroTimer from './PomodoroTimer'
 import TaskList from './TaskList'
+import UserPanel from "./UserPanel";
 
 function App() {
   const [user, setUser] = useState(null);
@@ -44,20 +43,28 @@ function App() {
   };
 
   return (
-    <Theme appearance="light" accentColor="green">
-      <Flex direction="column" align="center" gap="3" style={{ marginBottom: 16 }}>
-        {user ? (
-          <>
-            <Text size="3">Hola, {user.displayName || user.email}</Text>
-            <Button size="1" color="red" onClick={handleLogout}>Cerrar sesión</Button>
-          </>
-        ) : (
-          <Button size="1" color="green" onClick={handleLogin}>Iniciar sesión con Google</Button>
-        )}
+    <Theme scaling="110%" accentColor="lime" panelBackground="solid" radius="small" style={{ width: "100vw", maxWidth: "100vw", overflowX: "hidden" }} appearance="dark">
+      <Flex direction="row" gap="3" mb="4" flexGrow="1" style={{ width: "100vw", maxWidth: "100vw", overflowX: "hidden" }} >
+        <Box style={{ width: 240, minWidth: 0, flexShrink: 0 }}>
+          <p>Publicidad</p>
+        </Box>
+        <Box style={{ flex: 1, minWidth: 0 }}>
+
+          <Container py="4">
+            <Grid gap="4" columns="2">
+              <Flex gap="4" direction="column">
+                <UserPanel user={user} onLogin={handleLogin} onLogout={handleLogout} />
+                <PomodoroTimer user={user} />
+              </Flex>
+              <Box>{user && <TaskList user={user} />}</Box>
+            </Grid>
+          </Container>
+        </Box>
+        <Box style={{ width: 240, minWidth: 0, flexShrink: 0 }}>
+          <p>Publicidad</p>
+        </Box>
       </Flex>
-      {user && <TaskList user={user} />}
-      <PomodoroTimer user={user} />
-    </Theme>
+    </Theme >
   )
 }
 

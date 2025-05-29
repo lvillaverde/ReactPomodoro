@@ -4,6 +4,7 @@
 
 import { getAuth } from "firebase/auth";
 import { getFirestore, doc, setDoc, getDoc } from "firebase/firestore";
+import { collection, addDoc, query, where, getDocs, orderBy, limit } from "firebase/firestore";
 import "./firebase"; // Asegúrate de inicializar Firebase en este archivo
 
 const auth = getAuth();
@@ -68,4 +69,42 @@ export default function resetLocalConfigAndState() {
     timeLeft: 15 * 60,
     endTime: null
   }));
+}
+
+// Guarda una nueva tarea en Firestore
+export async function addTask({ name, detail, pomodoros }) {
+  const user = auth.currentUser;
+  if (!user) throw new Error("No user logged in");
+
+  // Obtener el mayor taskOrder actual
+  const q = query(
+    collection(db, "tasks"),
+    where("uid", "==", user.uid),
+    orderBy("taskOrder", "desc"),
+    limit(1)
+  );
+  const snap = await getDocs(q);
+  let lastOrder = 0;
+  if (!snap.empty) {
+    lastOrder = snap.docs[0].data().taskOrder || 0;
+  }
+
+  // Guardar la nueva tarea con isComplete: false
+  await addDoc(collection(db, "tasks"), {
+    uid: user.uid,
+    name,
+    detail,
+    pomodoros,
+    isComplete: false,
+    taskOrder: lastOrder + 1,
+    createdAt: Date.now()
+  });
+}
+
+// Actualiza el estado de completitud de una tarea
+export async function setTaskComplete(taskId, isComplete) {
+  const user = auth.currentUser;
+  if (!user) throw new Error("No user logged in");
+  const taskRef = doc(db, "tasks", taskId);
+  await setDoc(taskRef, { isComplete }, { merge: true });
 }

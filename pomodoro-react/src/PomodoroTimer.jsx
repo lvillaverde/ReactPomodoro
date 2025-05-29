@@ -4,7 +4,7 @@ import { Button, Flex, Card, Heading, Text, Progress, Skeleton } from "@radix-ui
 import ConfigDialog from "./ConfigDialog";
 import DingSound from "./assets/ding.wav";
 import { saveTimerState, loadTimerState, saveConfig, loadConfig } from "./userStorage";
-
+import { PlayIcon, ReloadIcon, PauseIcon, TrackNextIcon, GearIcon } from "@radix-ui/react-icons"
 
 function PomodoroTimer({ user }) {
     // Inicializa los valores como null para evitar mostrar datos hasta que se cargue Firestore/localStorage
@@ -368,11 +368,13 @@ function PomodoroTimer({ user }) {
 
     // Calcula el progreso (0 a 1)
     const totalTime = mode === 'focus' ? focusMinutes * 60 : breakMinutes * 60;
-    const progress = timeLeft && totalTime ? timeLeft / totalTime : 0;
+    const progressRaw = timeLeft && totalTime ? (timeLeft / totalTime) : 0;
+    // El valor para Progress debe ser entre 0 y 100
+    const progressValue = Number.isFinite(progressRaw) ? Math.max(0, Math.min(100, progressRaw * 100)) : 0;
 
     if (loading || mode === null || focusMinutes === null || breakMinutes === null || timeLeft === null) {
         return (
-            <Flex direction="column" align="center" justify="center" style={{ margin: '2rem auto', minHeight: 320 }}>
+            <Flex direction="column" align="center" justify="center">
                 <Card style={{ width: '100%', padding: 24 }}>
                     <div style={{ background: "#eee", borderRadius: 8, height: 32, width: 180, margin: "0 auto", marginBottom: 16 }} />
                     <div style={{ background: "#eee", borderRadius: 8, height: 56, width: 120, margin: "1.5rem auto" }} />
@@ -390,22 +392,26 @@ function PomodoroTimer({ user }) {
     }
 
     return (
-        <Flex direction="column" align="center" justify="center" style={{ margin: '2rem auto', minHeight: 320 }}>
-            <Card style={{ width: '100%', padding: 24 }}>
-                <Heading align="center" size="4" mb="3">
-                    {mode === 'focus' ? 'Modo concentración' : 'Descanso'}
+
+        <Card style={{ width: '100%' }}>
+            <Flex direction="column">
+                <Heading>
+                    Pomodoro Timer
                 </Heading>
                 <Text as="div" align="center" size="8" style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700, margin: '1.5rem 0' }}>
                     {formatTime(timeLeft)}
                 </Text>
-                <Progress value={progress * 100} max={100} size="3" style={{ margin: '1rem 0' }} />
+                <Text as="div" align="center" size="3" style={{ marginBottom: '1rem' }}>
+                    {mode === 'focus' ? 'Modo concentración' : 'Descanso'}
+                </Text>
+                <Progress value={progressValue} max={100} size="3" style={{ margin: '1rem 0' }} />
                 <audio ref={dingRef} src={DingSound} preload="auto" />
                 <Flex gap="3" justify="center">
-                    <Button size="1" onClick={handlePlay} disabled={isRunning} variant="solid" color="green">Play</Button>
-                    <Button size="1" onClick={handlePause} disabled={!isRunning} variant="solid" color="orange">Pausa</Button>
-                    <Button size="1" onClick={handleReset} variant="solid" color="red">Reiniciar</Button>
-                    <Button size="1" onClick={handleNext} variant="solid" color="blue">Next</Button>
-                    <Button size="1" variant="soft" onClick={() => setOpenConfig(true)}>Configurar</Button>
+                    <Button onClick={handlePlay} disabled={isRunning} variant="solid"><PlayIcon /></Button>
+                    <Button onClick={handlePause} disabled={!isRunning} variant="solid"><PauseIcon /></Button>
+                    <Button onClick={handleReset} variant="soft"><ReloadIcon /></Button>
+                    <Button onClick={handleNext} variant="soft"><TrackNextIcon /></Button>
+                    <Button variant="soft" onClick={() => setOpenConfig(true)}><GearIcon /></Button>
                 </Flex>
                 <ConfigDialog
                     open={openConfig}
@@ -415,8 +421,9 @@ function PomodoroTimer({ user }) {
                     setFocusMinutes={setFocusMinutes}
                     setBreakMinutes={setBreakMinutes}
                 />
-            </Card>
-        </Flex>
+            </Flex>
+        </Card>
+
     )
 }
 

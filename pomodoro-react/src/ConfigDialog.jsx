@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Dialog, Button, Flex, Text } from "@radix-ui/themes";
+import { Dialog, Button, Flex, Text, TextField } from "@radix-ui/themes";
 
 function ConfigDialog({ open, onOpenChange, focusMinutes, breakMinutes, setFocusMinutes, setBreakMinutes }) {
   // Estados locales para los inputs
@@ -24,28 +24,33 @@ function ConfigDialog({ open, onOpenChange, focusMinutes, breakMinutes, setFocus
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Content style={{ maxWidth: 340 }}>
+        <Dialog.Title>Configurar tiempos</Dialog.Title>
         <Text as="div" size="4" mb="4">Configurar tiempos</Text>
         <Flex direction="column" gap="3" mb="4">
-          <label>
-            <Text as="span" size="3">Tiempo de concentración (minutos)</Text>
-            <input
+          <Flex direction="column" gap="1">
+            <Text as="label" size="3" htmlFor="focus-minutes-input">
+              Tiempo de concentración (minutos)
+            </Text>
+            <TextField.Root
+              id="focus-minutes-input"
               type="number"
               min={1}
               value={localFocus}
               onChange={e => setLocalFocus(Number(e.target.value))}
-              style={{ width: '100%', marginTop: 4, padding: 6, borderRadius: 4, border: '1px solid #ccc' }}
             />
-          </label>
-          <label>
-            <Text as="span" size="3">Tiempo de descanso (minutos)</Text>
-            <input
+          </Flex>
+          <Flex direction="column" gap="1">
+            <Text as="label" size="3" htmlFor="break-minutes-input">
+              Tiempo de descanso (minutos)
+            </Text>
+            <TextField.Root
+              id="break-minutes-input"
               type="number"
               min={1}
               value={localBreak}
               onChange={e => setLocalBreak(Number(e.target.value))}
-              style={{ width: '100%', marginTop: 4, padding: 6, borderRadius: 4, border: '1px solid #ccc' }}
             />
-          </label>
+          </Flex>
         </Flex>
         <Flex justify="end" gap="3">
           <Dialog.Close>
