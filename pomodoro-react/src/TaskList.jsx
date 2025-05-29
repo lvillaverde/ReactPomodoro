@@ -1,10 +1,10 @@
-import { Card, Heading, Text, Flex, Button, Dialog } from "@radix-ui/themes";
+import { Card, Heading, Text, Flex, Button, Dialog, Separator } from "@radix-ui/themes";
 import { useState, useEffect } from "react";
 import { collection, query, where, orderBy, getDocs, deleteDoc, doc, writeBatch } from "firebase/firestore";
 import { getFirestore } from "firebase/firestore";
 import TaskDetail from "./TaskDetail";
 import { setTaskComplete } from "./userStorage";
-import { RowsIcon, TrashIcon } from "@radix-ui/react-icons"
+import { RowsIcon, TrashIcon, LapTimerIcon, Pencil1Icon } from "@radix-ui/react-icons"
 import "./firebase";
 
 // dnd-kit imports
@@ -30,6 +30,7 @@ function TaskList({ user }) {
   const [openDialog, setOpenDialog] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deletingTaskId, setDeletingTaskId] = useState(null);
+  const [editingTask, setEditingTask] = useState(null); // NUEVO
 
   useEffect(() => {
     if (!user) return;
@@ -125,9 +126,16 @@ function TaskList({ user }) {
       <Flex direction="column">
         <Heading style={{ width: "100%" }}>Tus tareas</Heading>
         <Flex gap="2" py="4" px="0">
-          <TaskDetailDialog open={openDialog} setOpen={setOpenDialog} />
+          <TaskDetailDialog
+            open={openDialog}
+            setOpen={open => {
+              setOpenDialog(open);
+              if (!open) setEditingTask(null);
+            }}
+            tasks={tasks}
+            editingTask={editingTask}
+          />
           <Button
-            size="1"
             color="red"
             variant="soft"
             loading={deleting}
@@ -162,6 +170,10 @@ function TaskList({ user }) {
                   deleting={deleting}
                   onDelete={handleDeleteTask}
                   deletingTaskId={deletingTaskId}
+                  onEdit={task => {
+                    setEditingTask(task);
+                    setOpenDialog(true);
+                  }}
                 />
               ))
             )}
@@ -173,7 +185,7 @@ function TaskList({ user }) {
 }
 
 // Sortable card using dnd-kit
-function SortableTaskCard({ id, task, onCheck, deleting, onDelete, deletingTaskId }) {
+function SortableTaskCard({ id, task, onCheck, deleting, onDelete, deletingTaskId, onEdit }) {
   const {
     attributes,
     listeners,
@@ -219,12 +231,16 @@ function SortableTaskCard({ id, task, onCheck, deleting, onDelete, deletingTaskI
             <Text size="3" style={{ textDecoration: task.isComplete ? "line-through" : "none" }}>
               {task.name}
             </Text>
+            <Separator orientation="vertical" />
+            <LapTimerIcon />
+            <Text size="2">{task.pomodoros}</Text>
           </Flex>
 
           {task.detail && (
             <Text
               size="2"
               color="gray"
+              my="2"
               style={{
                 display: "-webkit-box",
                 WebkitLineClamp: 2,
@@ -237,22 +253,35 @@ function SortableTaskCard({ id, task, onCheck, deleting, onDelete, deletingTaskI
               {task.detail}
             </Text>
           )}
+          
         </Flex>
         <Flex grow="1" gap="2" px="1" direction="row" style={{ alignItems: "center", justifyContent: "center" }}>
           {/* Botón icono a la izquierda del RowsIcon, solo visible en hover */}
           {isHovered && (
-            <Button
-              size="1"
-              variant="ghost"
-              color="red"
-              style={{ padding: 0, minWidth: 24, minHeight: 24, marginRight: 4 }}
-              tabIndex={-1}
-              onClick={() => onDelete(task.id)}
-              loading={deletingTaskId === task.id}
-              disabled={deletingTaskId === task.id}
-            >
-              <TrashIcon />
-            </Button>
+            <>
+              <Button
+                size="1"
+                variant="ghost"
+                color="blue"
+                style={{ padding: 0, minWidth: 24, minHeight: 24, marginRight: 4 }}
+                tabIndex={-1}
+                onClick={() => onEdit(task)}
+              >
+                <Pencil1Icon />
+              </Button>
+              <Button
+                size="1"
+                variant="ghost"
+                color="red"
+                style={{ padding: 0, minWidth: 24, minHeight: 24, marginRight: 4 }}
+                tabIndex={-1}
+                onClick={() => onDelete(task.id)}
+                loading={deletingTaskId === task.id}
+                disabled={deletingTaskId === task.id}
+              >
+                <TrashIcon />
+              </Button>
+            </>
           )}
           <Button
             size="1"
@@ -269,16 +298,21 @@ function SortableTaskCard({ id, task, onCheck, deleting, onDelete, deletingTaskI
   );
 }
 
-// Componente para el Dialog de agregar tarea
-function TaskDetailDialog({ open, setOpen }) {
+// Componente para el Dialog de agregar/editar tarea
+function TaskDetailDialog({ open, setOpen, tasks, editingTask }) {
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
       <Dialog.Trigger>
-        <Button size="1" variant="solid" onClick={() => setOpen(true)}>
+        <Button variant="solid" onClick={() => setOpen(true)}>
           Agregar Tarea
         </Button>
       </Dialog.Trigger>
-      <TaskDetail onClose={() => setOpen(false)} open={open} />
+      <TaskDetail
+        onClose={() => setOpen(false)}
+        open={open}
+        tasks={tasks}
+        editingTask={editingTask}
+      />
     </Dialog.Root>
   );
 }
