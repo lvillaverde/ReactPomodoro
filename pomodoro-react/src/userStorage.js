@@ -32,7 +32,7 @@ export async function loadTimerState() {
   }
 }
 
-// Guarda la configuración (focusMinutes, breakMinutes)
+// Guarda la configuración (focusMinutes, breakMinutes, longBreakMinutes, intervals)
 export async function saveConfig(config) {
   const user = auth.currentUser;
   if (user) {
@@ -40,6 +40,12 @@ export async function saveConfig(config) {
   } else {
     localStorage.setItem("focusMinutes", config.focusMinutes);
     localStorage.setItem("breakMinutes", config.breakMinutes);
+    if (config.longBreakMinutes !== undefined) {
+      localStorage.setItem("longBreakMinutes", config.longBreakMinutes);
+    }
+    if (config.intervals !== undefined) {
+      localStorage.setItem("intervals", config.intervals);
+    }
   }
 }
 
@@ -52,9 +58,13 @@ export async function loadConfig() {
   } else {
     const focus = localStorage.getItem("focusMinutes");
     const brk = localStorage.getItem("breakMinutes");
+    const longBrk = localStorage.getItem("longBreakMinutes");
+    const intervals = localStorage.getItem("intervals");
     return {
       focusMinutes: focus !== null && !isNaN(Number(focus)) ? Number(focus) : 15,
       breakMinutes: brk !== null && !isNaN(Number(brk)) ? Number(brk) : 5,
+      longBreakMinutes: longBrk !== null && !isNaN(Number(longBrk)) ? Number(longBrk) : 15,
+      intervals: intervals !== null && !isNaN(Number(intervals)) ? Number(intervals) : 4,
     };
   }
 }
@@ -67,7 +77,8 @@ export default function resetLocalConfigAndState() {
     mode: 'focus',
     isRunning: false,
     timeLeft: 15 * 60,
-    endTime: null
+    endTime: null,
+    cycleCount: 0
   }));
 }
 

@@ -12,9 +12,12 @@ function PomodoroTimer({ user }) {
     const [isRunning, setIsRunning] = useState(false);
     const [focusMinutes, setFocusMinutes] = useState(null);
     const [breakMinutes, setBreakMinutes] = useState(null);
+    const [longBreakMinutes, setLongBreakMinutes] = useState(null);
     const [timeLeft, setTimeLeft] = useState(null);
     const [openConfig, setOpenConfig] = useState(false)
     const [loading, setLoading] = useState(true);
+    const [intervals, setIntervals] = useState(null);
+    const [cycleCount, setCycleCount] = useState(0); // Nuevo: cuenta de ciclos focus/break
     const lastTimestampRef = useRef(null)
     const rafRef = useRef(null)
     const endTimeRef = useRef(null)
@@ -46,18 +49,39 @@ function PomodoroTimer({ user }) {
                     dingRef.current.currentTime = 0;
                     dingRef.current.play();
                 }
+                // --- Lógica de cambio de modo ---
                 if (mode === 'focus') {
-                    setMode('break');
-                    setTimeLeft(breakMinutes * 60);
-                    setIsRunning(true);
-                    endTimeRef.current = Date.now() + breakMinutes * 60 * 1000;
-                    saveTimerStateWrapper({
-                        mode: 'break',
-                        isRunning: true,
-                        timeLeft: breakMinutes * 60,
-                        endTime: endTimeRef.current
-                    });
-                } else {
+                    if (cycleCount < intervals - 1) {
+                        // Break normal
+                        setMode('break');
+                        setTimeLeft(breakMinutes * 60);
+                        setIsRunning(true);
+                        endTimeRef.current = Date.now() + breakMinutes * 60 * 1000;
+                        setCycleCount(cycleCount + 1);
+                        saveTimerStateWrapper({
+                            mode: 'break',
+                            isRunning: true,
+                            timeLeft: breakMinutes * 60,
+                            endTime: endTimeRef.current,
+                            cycleCount: cycleCount + 1
+                        });
+                    } else {
+                        // Long break
+                        setMode('longBreak');
+                        setTimeLeft(longBreakMinutes * 60);
+                        setIsRunning(true);
+                        endTimeRef.current = Date.now() + longBreakMinutes * 60 * 1000;
+                        setCycleCount(0);
+                        saveTimerStateWrapper({
+                            mode: 'longBreak',
+                            isRunning: true,
+                            timeLeft: longBreakMinutes * 60,
+                            endTime: endTimeRef.current,
+                            cycleCount: 0
+                        });
+                    }
+                } else if (mode === 'break') {
+                    // Después de break normal, vuelve a focus
                     setMode('focus');
                     setTimeLeft(focusMinutes * 60);
                     setIsRunning(true);
@@ -66,7 +90,22 @@ function PomodoroTimer({ user }) {
                         mode: 'focus',
                         isRunning: true,
                         timeLeft: focusMinutes * 60,
-                        endTime: endTimeRef.current
+                        endTime: endTimeRef.current,
+                        cycleCount
+                    });
+                } else if (mode === 'longBreak') {
+                    // Después de longBreak, vuelve a focus y ciclo 0
+                    setMode('focus');
+                    setTimeLeft(focusMinutes * 60);
+                    setIsRunning(true);
+                    endTimeRef.current = Date.now() + focusMinutes * 60 * 1000;
+                    setCycleCount(0);
+                    saveTimerStateWrapper({
+                        mode: 'focus',
+                        isRunning: true,
+                        timeLeft: focusMinutes * 60,
+                        endTime: endTimeRef.current,
+                        cycleCount: 0
                     });
                 }
                 return;
@@ -80,23 +119,39 @@ function PomodoroTimer({ user }) {
             const secondsLeft = Math.max(0, Math.round((endTimeRef.current - now) / 1000));
             setTimeLeft(secondsLeft);
             if (secondsLeft <= 0) {
-                // Ding!
                 if (dingRef.current) {
                     dingRef.current.currentTime = 0;
                     dingRef.current.play();
                 }
                 if (mode === 'focus') {
-                    setMode('break');
-                    setTimeLeft(breakMinutes * 60);
-                    setIsRunning(true);
-                    endTimeRef.current = Date.now() + breakMinutes * 60 * 1000;
-                    saveTimerStateWrapper({
-                        mode: 'break',
-                        isRunning: true,
-                        timeLeft: breakMinutes * 60,
-                        endTime: endTimeRef.current
-                    });
-                } else {
+                    if (cycleCount < intervals - 1) {
+                        setMode('break');
+                        setTimeLeft(breakMinutes * 60);
+                        setIsRunning(true);
+                        endTimeRef.current = Date.now() + breakMinutes * 60 * 1000;
+                        setCycleCount(cycleCount + 1);
+                        saveTimerStateWrapper({
+                            mode: 'break',
+                            isRunning: true,
+                            timeLeft: breakMinutes * 60,
+                            endTime: endTimeRef.current,
+                            cycleCount: cycleCount + 1
+                        });
+                    } else {
+                        setMode('longBreak');
+                        setTimeLeft(longBreakMinutes * 60);
+                        setIsRunning(true);
+                        endTimeRef.current = Date.now() + longBreakMinutes * 60 * 1000;
+                        setCycleCount(0);
+                        saveTimerStateWrapper({
+                            mode: 'longBreak',
+                            isRunning: true,
+                            timeLeft: longBreakMinutes * 60,
+                            endTime: endTimeRef.current,
+                            cycleCount: 0
+                        });
+                    }
+                } else if (mode === 'break') {
                     setMode('focus');
                     setTimeLeft(focusMinutes * 60);
                     setIsRunning(true);
@@ -105,7 +160,21 @@ function PomodoroTimer({ user }) {
                         mode: 'focus',
                         isRunning: true,
                         timeLeft: focusMinutes * 60,
-                        endTime: endTimeRef.current
+                        endTime: endTimeRef.current,
+                        cycleCount
+                    });
+                } else if (mode === 'longBreak') {
+                    setMode('focus');
+                    setTimeLeft(focusMinutes * 60);
+                    setIsRunning(true);
+                    endTimeRef.current = Date.now() + focusMinutes * 60 * 1000;
+                    setCycleCount(0);
+                    saveTimerStateWrapper({
+                        mode: 'focus',
+                        isRunning: true,
+                        timeLeft: focusMinutes * 60,
+                        endTime: endTimeRef.current,
+                        cycleCount: 0
                     });
                 }
             }
@@ -145,7 +214,7 @@ function PomodoroTimer({ user }) {
             if (rafRef.current) cancelAnimationFrame(rafRef.current);
             if (intervalId) clearInterval(intervalId);
         };
-    }, [isRunning, mode, focusMinutes, breakMinutes])
+    }, [isRunning, mode, focusMinutes, breakMinutes, longBreakMinutes, intervals, cycleCount])
 
     // Actualiza el <title> en tiempo real, incluso en segundo plano
     useEffect(() => {
@@ -215,16 +284,17 @@ function PomodoroTimer({ user }) {
     // Guardar valores en storage cuando cambian
     useEffect(() => {
         if (loading) return;
-        saveConfig({ focusMinutes, breakMinutes });
-    }, [focusMinutes, breakMinutes, loading]);
+        saveConfig({ focusMinutes, breakMinutes, longBreakMinutes, intervals });
+    }, [focusMinutes, breakMinutes, longBreakMinutes, intervals, loading]);
 
     // --- PERSISTENCIA DE ESTADO DEL TIMER ---
-    async function saveTimerStateWrapper({ mode, isRunning, timeLeft, endTime }) {
+    async function saveTimerStateWrapper({ mode, isRunning, timeLeft, endTime, cycleCount: cc }) {
         await saveTimerState({
             mode,
             isRunning,
             timeLeft,
             endTime: isRunning ? endTime : null,
+            cycleCount: typeof cc === "number" ? cc : cycleCount
         });
     }
 
@@ -242,19 +312,25 @@ function PomodoroTimer({ user }) {
                 mode: mode ?? 'focus',
                 isRunning: false,
                 timeLeft: timeLeft ?? 15 * 60,
-                endTime: null
+                endTime: null,
+                cycleCount: 0
             });
 
             const config = await loadConfig();
             let loadedFocus = config?.focusMinutes ?? 15;
             let loadedBreak = config?.breakMinutes ?? 5;
+            let loadedLongBreak = config?.longBreakMinutes ?? 15;
+            let loadedIntervals = config?.intervals ?? 4;
             setFocusMinutes(loadedFocus);
             setBreakMinutes(loadedBreak);
+            setLongBreakMinutes(loadedLongBreak);
+            setIntervals(loadedIntervals);
 
             const saved = await loadTimerState();
             if (saved) {
-                const { mode: savedMode, isRunning: savedIsRunning, timeLeft: savedTimeLeft, endTime } = saved;
+                const { mode: savedMode, isRunning: savedIsRunning, timeLeft: savedTimeLeft, endTime, cycleCount: savedCycleCount } = saved;
                 setMode(savedMode || 'focus');
+                setCycleCount(typeof savedCycleCount === "number" ? savedCycleCount : 0);
                 if (savedIsRunning && endTime) {
                     const now = Date.now();
                     const left = Math.max(0, Math.round((endTime - now) / 1000));
@@ -278,6 +354,7 @@ function PomodoroTimer({ user }) {
             } else {
                 setMode('focus');
                 setTimeLeft(loadedFocus * 60);
+                setCycleCount(0);
                 endTimeRef.current = null;
                 setIsRunning(false);
             }
@@ -292,13 +369,15 @@ function PomodoroTimer({ user }) {
         setIsRunning(false)
         setMode('focus')
         setTimeLeft(focusMinutes * 60)
+        setCycleCount(0)
         lastTimestampRef.current = null
         endTimeRef.current = null
         saveTimerStateWrapper({
             mode: 'focus',
             isRunning: false,
             timeLeft: focusMinutes * 60,
-            endTime: null
+            endTime: null,
+            cycleCount: 0
         });
     }
 
@@ -342,17 +421,34 @@ function PomodoroTimer({ user }) {
     // Next: cambia de modo manualmente
     function handleNext() {
         if (mode === 'focus') {
-            setMode('break');
-            setTimeLeft(breakMinutes * 60);
-            setIsRunning(false);
-            endTimeRef.current = null;
-            saveTimerStateWrapper({
-                mode: 'break',
-                isRunning: false,
-                timeLeft: breakMinutes * 60,
-                endTime: null
-            });
-        } else {
+            if (cycleCount < intervals - 1) {
+                setMode('break');
+                setTimeLeft(breakMinutes * 60);
+                setIsRunning(false);
+                endTimeRef.current = null;
+                setCycleCount(cycleCount + 1);
+                saveTimerStateWrapper({
+                    mode: 'break',
+                    isRunning: false,
+                    timeLeft: breakMinutes * 60,
+                    endTime: null,
+                    cycleCount: cycleCount + 1
+                });
+            } else {
+                setMode('longBreak');
+                setTimeLeft(longBreakMinutes * 60);
+                setIsRunning(false);
+                endTimeRef.current = null;
+                setCycleCount(0);
+                saveTimerStateWrapper({
+                    mode: 'longBreak',
+                    isRunning: false,
+                    timeLeft: longBreakMinutes * 60,
+                    endTime: null,
+                    cycleCount: 0
+                });
+            }
+        } else if (mode === 'break') {
             setMode('focus');
             setTimeLeft(focusMinutes * 60);
             setIsRunning(false);
@@ -361,15 +457,33 @@ function PomodoroTimer({ user }) {
                 mode: 'focus',
                 isRunning: false,
                 timeLeft: focusMinutes * 60,
-                endTime: null
+                endTime: null,
+                cycleCount
+            });
+        } else if (mode === 'longBreak') {
+            setMode('focus');
+            setTimeLeft(focusMinutes * 60);
+            setIsRunning(false);
+            endTimeRef.current = null;
+            setCycleCount(0);
+            saveTimerStateWrapper({
+                mode: 'focus',
+                isRunning: false,
+                timeLeft: focusMinutes * 60,
+                endTime: null,
+                cycleCount: 0
             });
         }
     }
 
     // Calcula el progreso (0 a 1)
-    const totalTime = mode === 'focus' ? focusMinutes * 60 : breakMinutes * 60;
+    const totalTime =
+        mode === 'focus'
+            ? focusMinutes * 60
+            : mode === 'break'
+            ? breakMinutes * 60
+            : longBreakMinutes * 60;
     const progressRaw = timeLeft && totalTime ? (timeLeft / totalTime) : 0;
-    // El valor para Progress debe ser entre 0 y 100
     const progressValue = Number.isFinite(progressRaw) ? Math.max(0, Math.min(100, progressRaw * 100)) : 0;
 
     if (loading || mode === null || focusMinutes === null || breakMinutes === null || timeLeft === null) {
@@ -392,7 +506,6 @@ function PomodoroTimer({ user }) {
     }
 
     return (
-
         <Card style={{ width: '100%' }}>
             <Flex direction="column">
                 <Heading>
@@ -402,7 +515,14 @@ function PomodoroTimer({ user }) {
                     {formatTime(timeLeft)}
                 </Text>
                 <Text as="div" align="center" size="3" style={{ marginBottom: '1rem' }}>
-                    {mode === 'focus' ? 'Modo concentración' : 'Descanso'}
+                    {mode === 'focus'
+                        ? 'Modo concentración'
+                        : mode === 'break'
+                        ? 'Descanso corto'
+                        : 'Descanso largo'}
+                </Text>
+                <Text as="div" align="center" size="2" style={{ marginBottom: '0.5rem', color: '#888' }}>
+                    Ciclo: {mode === 'longBreak' ? intervals : cycleCount + (mode === 'break' ? 0 : 1)} / {intervals}
                 </Text>
                 <Progress value={progressValue} max={100} size="3" style={{ margin: '1rem 0' }} />
                 <audio ref={dingRef} src={DingSound} preload="auto" />
@@ -420,10 +540,13 @@ function PomodoroTimer({ user }) {
                     breakMinutes={breakMinutes}
                     setFocusMinutes={setFocusMinutes}
                     setBreakMinutes={setBreakMinutes}
+                    longBreakMinutes={longBreakMinutes}
+                    setLongBreakMinutes={setLongBreakMinutes}
+                    intervals={intervals}
+                    setIntervals={setIntervals}
                 />
             </Flex>
         </Card>
-
     )
 }
 

@@ -2,6 +2,7 @@ import { Dialog, TextField, Button, Flex, TextArea } from "@radix-ui/themes";
 import { useState, useEffect } from "react";
 import { addTask } from "./userStorage";
 import { getFirestore, doc, updateDoc } from "firebase/firestore";
+import NumberSelector from "./NumberSelector";
 
 function TaskDetail({ onClose, open, tasks = [], editingTask }) {
   const [name, setName] = useState("");
@@ -71,39 +72,12 @@ function TaskDetail({ onClose, open, tasks = [], editingTask }) {
           value={detail}
           onChange={e => setDetail(e.target.value)}
         />
-        <Flex direction="column" gap="1">
-          <label>Pomodoros</label>
-          <Flex direction="row" gap="2">
-            <Button
-              variant="soft"
-              color="gray"
-              onClick={() => setPomodoros(prev => String(Math.max(0, Number(prev) - 1)))}
-              disabled={Number(pomodoros) <= 0}
-              style={{ minWidth: 40 }}
-            >-</Button>
-            <TextField.Root
-              type="number"
-              min={0}
-              value={pomodoros}
-              onChange={e => {
-                const val = e.target.value.replace(/\D/g, "");
-                setPomodoros(val === "" ? "0" : String(Math.max(0, Number(val))));
-              }}
-              style={{
-                width: 60,
-                textAlign: "center",
-                fontSize: 20,
-                padding: "6px 0"
-              }}
-            />
-            <Button
-              variant="soft"
-              color="gray"
-              onClick={() => setPomodoros(prev => String(Number(prev) + 1))}
-              style={{ minWidth: 40 }}
-            >+</Button>
-          </Flex>
-        </Flex>
+        <NumberSelector
+          label="Pomodoros"
+          value={pomodoros}
+          setValue={setPomodoros}
+          disabled={saving}
+        />
       </Flex>
       <Flex justify="end" gap="3">
         <Dialog.Close>
