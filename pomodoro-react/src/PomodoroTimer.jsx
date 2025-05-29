@@ -4,9 +4,9 @@ import { Button, Flex, Card, Heading, Text, Progress, Skeleton } from "@radix-ui
 import ConfigDialog from "./ConfigDialog";
 import DingSound from "./assets/ding.wav";
 import { saveTimerState, loadTimerState, saveConfig, loadConfig } from "./userStorage";
-import { PlayIcon, ReloadIcon, PauseIcon, TrackNextIcon, GearIcon } from "@radix-ui/react-icons"
+import { PlayIcon, ReloadIcon, PauseIcon, TrackNextIcon, GearIcon, Cross2Icon } from "@radix-ui/react-icons"
 
-function PomodoroTimer({ user }) {
+function PomodoroTimer({ user, task, onTaskStarted }) {
     // Inicializa los valores como null para evitar mostrar datos hasta que se cargue Firestore/localStorage
     const [mode, setMode] = useState(null);
     const [isRunning, setIsRunning] = useState(false);
@@ -18,6 +18,7 @@ function PomodoroTimer({ user }) {
     const [loading, setLoading] = useState(true);
     const [intervals, setIntervals] = useState(null);
     const [cycleCount, setCycleCount] = useState(0); // Nuevo: cuenta de ciclos focus/break
+    const [totalPomodoros, setTotalPomodoros] = useState(null); // NUEVO: para tareas
     const lastTimestampRef = useRef(null)
     const rafRef = useRef(null)
     const endTimeRef = useRef(null)
@@ -51,6 +52,25 @@ function PomodoroTimer({ user }) {
                 }
                 // --- Lógica de cambio de modo ---
                 if (mode === 'focus') {
+                    // --- AJUSTE: Si hay tarea, cortar cuando se cumplan los pomodoros ---
+                    if (totalPomodoros !== null && (cycleCount + 1 >= totalPomodoros)) {
+                        // Terminó la tarea
+                        setMode('focus');
+                        setIsRunning(false);
+                        setTimeLeft(focusMinutes * 60);
+                        setCycleCount(0);
+                        setTotalPomodoros(null);
+                        endTimeRef.current = null;
+                        saveTimerStateWrapper({
+                            mode: 'focus',
+                            isRunning: false,
+                            timeLeft: focusMinutes * 60,
+                            endTime: null,
+                            cycleCount: 0
+                        });
+                        return;
+                    }
+                    // --- FIN AJUSTE ---
                     if (cycleCount < intervals - 1) {
                         // Break normal
                         setMode('break');
@@ -124,6 +144,25 @@ function PomodoroTimer({ user }) {
                     dingRef.current.play();
                 }
                 if (mode === 'focus') {
+                    // --- AJUSTE: Si hay tarea, cortar cuando se cumplan los pomodoros ---
+                    if (totalPomodoros !== null && (cycleCount + 1 >= totalPomodoros)) {
+                        // Terminó la tarea
+                        setMode('focus');
+                        setIsRunning(false);
+                        setTimeLeft(focusMinutes * 60);
+                        setCycleCount(0);
+                        setTotalPomodoros(null);
+                        endTimeRef.current = null;
+                        saveTimerStateWrapper({
+                            mode: 'focus',
+                            isRunning: false,
+                            timeLeft: focusMinutes * 60,
+                            endTime: null,
+                            cycleCount: 0
+                        });
+                        return;
+                    }
+                    // --- FIN AJUSTE ---
                     if (cycleCount < intervals - 1) {
                         setMode('break');
                         setTimeLeft(breakMinutes * 60);
@@ -214,7 +253,8 @@ function PomodoroTimer({ user }) {
             if (rafRef.current) cancelAnimationFrame(rafRef.current);
             if (intervalId) clearInterval(intervalId);
         };
-    }, [isRunning, mode, focusMinutes, breakMinutes, longBreakMinutes, intervals, cycleCount])
+    }, [isRunning, mode, focusMinutes, breakMinutes, longBreakMinutes, intervals, cycleCount, totalPomodoros])
+    // Nota: agrega totalPomodoros a las deps
 
     // Actualiza el <title> en tiempo real, incluso en segundo plano
     useEffect(() => {
@@ -481,10 +521,22 @@ function PomodoroTimer({ user }) {
         mode === 'focus'
             ? focusMinutes * 60
             : mode === 'break'
-            ? breakMinutes * 60
-            : longBreakMinutes * 60;
+                ? breakMinutes * 60
+                : longBreakMinutes * 60;
     const progressRaw = timeLeft && totalTime ? (timeLeft / totalTime) : 0;
     const progressValue = Number.isFinite(progressRaw) ? Math.max(0, Math.min(100, progressRaw * 100)) : 0;
+
+    // Ajusta el ciclo mostrado si hay tarea
+    // NUEVO: calcula ciclosMax según pomodoros/intervalos
+    let ciclosMax;
+    if (task && typeof task.pomodoros === "number" && intervals) {
+        ciclosMax = Math.max(1, Math.ceil(task.pomodoros / intervals));
+    } else {
+        ciclosMax = intervals;
+    }
+    const ciclosActual = mode === 'longBreak'
+        ? (totalPomodoros !== null ? Math.min(ciclosMax, cycleCount) : intervals)
+        : (totalPomodoros !== null ? Math.min(ciclosMax, cycleCount + (mode === 'break' ? 0 : 1)) : cycleCount + (mode === 'break' ? 0 : 1));
 
     if (loading || mode === null || focusMinutes === null || breakMinutes === null || timeLeft === null) {
         return (
@@ -518,11 +570,54 @@ function PomodoroTimer({ user }) {
                     {mode === 'focus'
                         ? 'Modo concentración'
                         : mode === 'break'
-                        ? 'Descanso corto'
-                        : 'Descanso largo'}
+                            ? 'Descanso corto'
+                            : 'Descanso largo'}
                 </Text>
-                <Text as="div" align="center" size="2" style={{ marginBottom: '0.5rem', color: '#888' }}>
-                    Ciclo: {mode === 'longBreak' ? intervals : cycleCount + (mode === 'break' ? 0 : 1)} / {intervals}
+                <Text as="div" align="center" size="2" style={{ marginBottom: '0.5rem', color: '#888', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8 }}>
+                    Ciclo: {ciclosActual} / {ciclosMax}
+                    {/* NUEVO: muestra el nombre de la tarea en un Button si hay */}
+                    {task && task.name && (
+                        <Button
+                            size="1"
+                            variant="soft"
+                            radius="large"
+                            style={{
+                                marginLeft: 12,
+                                color: '#fff',
+                                fontWeight: 500,
+                                fontSize: 14,
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                maxWidth: 140,
+                                // pointerEvents: 'none', // Quitar para permitir click
+                                cursor: 'pointer'
+                            }}
+                            tabIndex={-1}
+                            onClick={() => {
+                                // Al hacer click, resetea el timer a valores por defecto
+                                setIsRunning(false);
+                                setMode('focus');
+                                setTimeLeft(focusMinutes * 60);
+                                setCycleCount(0);
+                                setTotalPomodoros(null);
+                                endTimeRef.current = null;
+                                if (typeof onTaskStarted === "function") {
+                                    onTaskStarted(); // Limpia la tarea seleccionada en App
+                                }
+                                saveTimerStateWrapper({
+                                    mode: 'focus',
+                                    isRunning: false,
+                                    timeLeft: focusMinutes * 60,
+                                    endTime: null,
+                                    cycleCount: 0
+                                });
+                            }}
+                        >
+                            <Cross2Icon style={{ marginRight: 4 }} />
+                            {task.name}
+                        </Button>
+                    )}
                 </Text>
                 <Progress value={progressValue} max={100} size="3" style={{ margin: '1rem 0' }} />
                 <audio ref={dingRef} src={DingSound} preload="auto" />

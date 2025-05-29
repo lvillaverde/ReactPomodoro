@@ -4,7 +4,7 @@ import { collection, query, where, orderBy, getDocs, deleteDoc, doc, writeBatch 
 import { getFirestore } from "firebase/firestore";
 import TaskDetail from "./TaskDetail";
 import { setTaskComplete } from "./userStorage";
-import { RowsIcon, TrashIcon, LapTimerIcon, Pencil1Icon } from "@radix-ui/react-icons"
+import { RowsIcon, TrashIcon, LapTimerIcon, Pencil1Icon, PlayIcon } from "@radix-ui/react-icons"
 import "./firebase";
 
 // dnd-kit imports
@@ -24,7 +24,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 
 // Componente principal de la lista de tareas
-function TaskList({ user }) {
+function TaskList({ user, onStartTask }) {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [openDialog, setOpenDialog] = useState(false);
@@ -174,6 +174,7 @@ function TaskList({ user }) {
                     setEditingTask(task);
                     setOpenDialog(true);
                   }}
+                  onStartTask={onStartTask} // NUEVO
                 />
               ))
             )}
@@ -185,7 +186,7 @@ function TaskList({ user }) {
 }
 
 // Sortable card using dnd-kit
-function SortableTaskCard({ id, task, onCheck, deleting, onDelete, deletingTaskId, onEdit }) {
+function SortableTaskCard({ id, task, onCheck, deleting, onDelete, deletingTaskId, onEdit, onStartTask }) {
   const {
     attributes,
     listeners,
@@ -231,9 +232,14 @@ function SortableTaskCard({ id, task, onCheck, deleting, onDelete, deletingTaskI
             <Text size="3" style={{ textDecoration: task.isComplete ? "line-through" : "none" }}>
               {task.name}
             </Text>
-            <Separator orientation="vertical" />
-            <LapTimerIcon />
-            <Text size="2">{task.pomodoros}</Text>
+            {/* Solo muestra el separator, icono y cantidad si pomodoros > 0 */}
+            {task.pomodoros > 0 && (
+              <>
+                <Separator orientation="vertical" />
+                <LapTimerIcon />
+                <Text size="2">{task.pomodoros}</Text>
+              </>
+            )}
           </Flex>
 
           {task.detail && (
@@ -253,12 +259,24 @@ function SortableTaskCard({ id, task, onCheck, deleting, onDelete, deletingTaskI
               {task.detail}
             </Text>
           )}
-          
+
         </Flex>
         <Flex grow="1" gap="2" px="1" direction="row" style={{ alignItems: "center", justifyContent: "center" }}>
           {/* Botón icono a la izquierda del RowsIcon, solo visible en hover */}
           {isHovered && (
             <>
+              {/* Solo muestra el PlayIcon si pomodoros > 0 */}
+              {task.pomodoros > 0 && (
+                <Button
+                  size="1"
+                  variant="ghost"
+                  color="green"
+                  style={{ padding: 0, minWidth: 24, minHeight: 24, marginRight: 4 }}
+                  onClick={() => onStartTask && onStartTask(task)} // NUEVO
+                >
+                  <PlayIcon />
+                </Button>
+              )}
               <Button
                 size="1"
                 variant="ghost"

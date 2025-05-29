@@ -10,6 +10,7 @@ import UserPanel from "./UserPanel";
 
 function App() {
   const [user, setUser] = useState(null);
+  const [selectedTask, setSelectedTask] = useState(null); // NUEVO
 
   useEffect(() => {
     let lastUser = null;
@@ -42,6 +43,11 @@ function App() {
     }
   };
 
+  // NUEVO: handler para iniciar timer con una tarea
+  const handleStartTask = (task) => {
+    setSelectedTask(task);
+  };
+
   return (
     <Theme scaling="110%" accentColor="lime" panelBackground="solid" radius="small" style={{ width: "100vw", maxWidth: "100vw", overflowX: "hidden" }} appearance="dark">
       <Flex direction="row" gap="3" mb="4" flexGrow="1" style={{ width: "100vw", maxWidth: "100vw", overflowX: "hidden" }} >
@@ -54,9 +60,15 @@ function App() {
             <Grid gap="4" columns="2">
               <Flex gap="4" direction="column">
                 <UserPanel user={user} onLogin={handleLogin} onLogout={handleLogout} />
-                <PomodoroTimer user={user} />
+                <PomodoroTimer
+                  user={user}
+                  task={selectedTask} // Cambia de taskPomodoros a task (pasa el objeto completo)
+                  onTaskStarted={() => setSelectedTask(null)}
+                />
               </Flex>
-              <Box>{user && <TaskList user={user} />}</Box>
+              <Box>
+                {user && <TaskList user={user} onStartTask={handleStartTask} />} {/* NUEVO */}
+              </Box>
             </Grid>
           </Container>
         </Box>
